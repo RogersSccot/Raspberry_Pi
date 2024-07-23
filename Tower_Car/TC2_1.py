@@ -19,11 +19,7 @@ last_car_point='C00'
 car_point='C00'
 car_center=[0,0]
 grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
-<<<<<<< HEAD
 grid_int=['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15']
-=======
-grid_int=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
->>>>>>> 7e5811fb923cd353139449ca1ce677f5787928ac
 M=np.load('M.npy')
 # 我们需要将我们读取到的图像映射成一个平整的图像
 ad=cv2.imread('grid.jpg')
@@ -117,7 +113,6 @@ def get_car_point():
     car_point=locate_car(car_center)
     return car_point
 
-<<<<<<< HEAD
 # 做一个映射变换
 def image_trans(image_to_trans):
     image_after_trans = cv2.warpPerspective(image_to_trans,M,(ad.shape[1],ad.shape[0]))
@@ -128,8 +123,6 @@ def image_trans(image_to_trans):
 get_image()
 map_origin=image_trans(image)
 
-=======
->>>>>>> 7e5811fb923cd353139449ca1ce677f5787928ac
 while True:
     try:
         if PBL==0:
@@ -146,7 +139,6 @@ while True:
                     last_car_point=car_point
         if PBL==b'P22':
             get_image()
-<<<<<<< HEAD
             map_coverd=image_trans(image)
             black_cover=(map_origin-map_coverd)
             grid_coverd_str=[]
@@ -163,20 +155,15 @@ while True:
                     grid_coverd_int.append(i)
             # 向stm32发送地图信息
             if aim_point22!=0:
+                # 开始路径规划
                 pass
-=======
-
->>>>>>> 7e5811fb923cd353139449ca1ce677f5787928ac
             pass
         else:
             time.sleep(0.1)
     except:
         PBL=0
         last_car_point='C00'
-<<<<<<< HEAD
         aim_point22=0
         aim_point23=0
-=======
->>>>>>> 7e5811fb923cd353139449ca1ce677f5787928ac
         time.sleep(0.1)
 
