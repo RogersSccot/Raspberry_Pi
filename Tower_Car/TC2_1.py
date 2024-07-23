@@ -20,6 +20,7 @@ car_point='C00'
 car_center=[0,0]
 grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
 grid_int=['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15']
+grid_cross=[[1,4],[2,5,0],[3,6,1],[7,2],[5,8,0],[6,9,4,1],[7,10,5,2],[11,6,3],[9,12,4],[10,13,8,5],[11,14,9,6],[15,10,7],[13,8],[14,12,9],[15,13,10],[14,11]]
 M=np.load('M.npy')
 # 我们需要将我们读取到的图像映射成一个平整的图像
 ad=cv2.imread('grid.jpg')
@@ -120,6 +121,45 @@ def image_trans(image_to_trans):
     _,image_after_trans=cv2.threshold(image_after_trans, 127, 255, cv2.THRESH_BINARY)
     return image_after_trans
 
+def find_road(aim_point22, grid_coverd_int):
+    road22=[[0]]
+    road_final=[]
+    while aim_point22 not in road_final:
+        try:
+            if len(road22)>1000:
+                print('no way')
+                return 0
+            if aim_point22 not in grid_coverd_int:
+                print('aim_point22 not in grid_coverd_int')
+                return 0
+            # 用于记录所有可能路径的最后一位
+            road_final=[]
+            # i表示保存的一条可能路径
+            for i in road22:
+                # print('i='+str(i))
+                # 找出这条路径的最后一位，找出最后一位的所有可能下一位
+                for j in grid_cross[i[-1]]:
+                    # print('j='+str(j))
+                    k=i.copy()
+                    if (j not in k) and (j not in road_final) and (j in grid_coverd_int):
+                        k.append(j)
+                        road22.append(k)
+                        road_final.append(j)
+        except:
+            print('break')
+            return 0
+    # print(road22)
+    road_possible=[]
+    road_length=[]
+    for r in road22:
+        if r[-1]==aim_point22:
+            road_possible.append(r)
+            road_length.append(len(r))
+    # 找出possible_road中的最短路径
+    # 找出最短路径
+    road_final=road_possible[road_length.index(min(road_length))]
+    return road_final
+
 get_image()
 map_origin=image_trans(image)
 
@@ -138,25 +178,50 @@ while True:
                     send_order(car_point,ser_32)
                     last_car_point=car_point
         if PBL==b'P22':
+            # 对应题目的2.2问，首先要确立路径点，然后给串口屏发定位
             get_image()
             map_coverd=image_trans(image)
+            # 找出对应的黑色区域
             black_cover=(map_origin-map_coverd)
+            # 建立两个集合用于存放地图信息
             grid_coverd_str=[]
             grid_coverd_int=[]
+            # 遍历每个区域，观察是否有遮挡
             for i in range(16):
                 x=int(i/4)*242
                 y=int(i%4)*242
                 b1=np.sum(black_cover[x:x+242,y:y+242]>100)
-                print(f'{i}:'+str(b1))
+                # print(f'{i}:'+str(b1))
                 if (b1>3000):
                     grid_coverd_str.append('MBB')
                 else:
                     grid_coverd_str.append('M'+grid_int[i])
                     grid_coverd_int.append(i)
             # 向stm32发送地图信息
-            if aim_point22!=0:
-                # 开始路径规划
-                pass
+            pass
+            # 开始路径规划
+            while True:
+                # 等待目标位置的发送
+                if aim_point22 in grid_coverd_int:
+                    # 开始路径规划
+                    road22_best=find_road(aim_point22, grid_coverd_int)
+                    # 现在已经找到了最好的路径
+                    road22_best_str=[]
+                    for i in road22_best:
+                        road22_best_str.append('P'+grid_str[i])
+                    break
+                time.sleep(0.1)
+            # 发送路径信息
+            pass
+            # 开始小车运动，发送小车位置
+            while PBL!=b'000':
+                try:
+                    car_point=get_car_point()
+                except:
+                    pass
+                if car_point!=last_car_point:
+                    send_order(car_point,ser_32)
+                    last_car_point=car_point
             pass
         else:
             time.sleep(0.1)
