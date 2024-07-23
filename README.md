@@ -4,4 +4,3 @@ This repository contains the code for Electric Competition.
 2.Laser Tower
 3.Balance Ball
 4.Tower Car
-# Raspberry_Pi
