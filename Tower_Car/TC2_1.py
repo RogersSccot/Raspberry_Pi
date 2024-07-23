@@ -5,9 +5,12 @@ import math
 import serial
 import threading
 import time
+from Vision_Net import FastestDet
 
 # 打开摄像头，占用内存大，不轻易运行
 capture=cv2.VideoCapture(0)
+loo_global=np.zeros((640,480,3),dtype=np.uint8)
+deep = FastestDet(drawOutput=True)
 
 # 打开串口
 ser_32 = serial.Serial('/dev/ttyAMA0', 921600)
@@ -33,6 +36,16 @@ ad_grey=cv2.cvtColor(ad, cv2.COLOR_BGR2GRAY)
 2.收到Bxx，表示2.2问的目标点
 3.收到Cxx，表示2.3问的目标点
 '''
+# 获取照片数字 
+def get_photo_number(frame):
+    out = deep.detect(frame)
+    num_position=[]
+    num=[]
+    for i in range(len(out)):
+        num_position.append(out[i][0])
+        num.append(int(out[i][1]))
+    return  num_position,num
+
 def get_PBL():
     global PBL, aim_point22, aim_point23
     print('读取题目信息')
@@ -224,8 +237,12 @@ while True:
                     last_car_point=car_point
             pass
         if PBL==b'P23':
+            # 首先我们需要识别新的地图数据
+            get_image()
             
+            # 将点的坐标映射后，观察观察每个区域内是否有点
             
+            # 之后的操作跟以前的方式一样，也可以在原地图上规划路径，不过需要显示新的地图
             
             pass
         else:
