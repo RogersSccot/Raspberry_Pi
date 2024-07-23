@@ -223,8 +223,17 @@ while True:
                     send_order(car_point,ser_32)
                     last_car_point=car_point
             pass
+        if PBL==b'P23':
+            
+            
+            
+            pass
         else:
             time.sleep(0.1)
+
+
+
+
     except:
         PBL=0
         last_car_point='C00'
