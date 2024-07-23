@@ -248,9 +248,6 @@ while True:
         else:
             time.sleep(0.1)
 
-
-
-
     except:
         PBL=0
         last_car_point='C00'
