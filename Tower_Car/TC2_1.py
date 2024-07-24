@@ -118,15 +118,15 @@ def locate_car(car_center):
     car_center_M=car_center
     car_index=int(car_center_M[0]/242)*4+int(car_center_M[1]/242)
     car_point='C'+str(int(car_index/10))+str(car_index%10)
-    return car_point
+    return car_point,car_index
 
 # 找到小车的点坐标
 def get_car_point():
     get_image()
     red_only=get_red()
     car_center=find_car_red(red_only)
-    car_point=locate_car(car_center)
-    return car_point
+    car_point,car_index=locate_car(car_center)
+    return car_point,car_index
 
 # 做一个映射变换
 def image_trans(image_to_trans):
@@ -206,7 +206,7 @@ while True:
             # 对应题目的2.1问，首先要确立路径点，然后给串口屏发定位
             while PBL!=b'000':
                 try:
-                    car_point=get_car_point()
+                    car_point,_=get_car_point()
                 except:
                     pass
                 if car_point!=last_car_point:
@@ -241,7 +241,7 @@ while True:
             # 开始小车运动，发送小车位置
             while PBL!=b'000':
                 try:
-                    car_point=get_car_point()
+                    car_point,_=get_car_point()
                 except:
                     pass
                 if car_point!=last_car_point:
@@ -277,11 +277,12 @@ while True:
             # 发送路径信息
             for i in grid_coverd_int:
                 send_order('P'+grid_int[i],ser_32)
-            pass            
+            pass
             # 开始小车运动，发送小车位置
             while PBL!=b'000':
                 try:
-                    car_point=get_car_point()
+                    car_point,car_index=get_car_point()
+                    car_point='C'+grid_int[grid_change_int[car_index]]
                 except:
                     pass
                 if car_point!=last_car_point:
