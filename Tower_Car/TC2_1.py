@@ -55,9 +55,9 @@ def get_PBL():
         print('mail ='+str(PBL))
         if PBL[0]==66:
             PBL=PBL.decode('utf-8')
-            aim_point22=grid_str_int[PBL[1]]
+            aim_point22=grid_str_int[PBL[2]]
         elif PBL[0]==67:
-            aim_point23=(PBL[1]-48)*10+(PBL[2]-48)
+            aim_point23=grid_str_int[PBL[2]]
 
 get_PBL_threading = threading.Thread(target=get_PBL)
 get_PBL_threading.start()
