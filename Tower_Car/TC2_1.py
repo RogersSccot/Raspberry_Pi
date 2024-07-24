@@ -216,23 +216,11 @@ while True:
             # 对应题目的2.2问，首先要确立路径点，然后给串口屏发定位
             get_image()
             map_coverd=image_trans(image)
-            # 找出对应的黑色区域
-            black_cover=(map_origin-map_coverd)
-            # 建立两个集合用于存放地图信息
-            grid_coverd_str=[]
-            grid_coverd_int=[]
-            # 遍历每个区域，观察是否有遮挡
-            for i in range(16):
-                x=int(i/4)*242
-                y=int(i%4)*242
-                b1=np.sum(black_cover[x:x+242,y:y+242]>100)
-                # print(f'{i}:'+str(b1))
-                if (b1>3000):
-                    grid_coverd_str.append('MBB')
-                else:
-                    grid_coverd_str.append('M'+grid_int[i])
-                    grid_coverd_int.append(i)
+            grid_coverd_str, grid_coverd_int=get_grid_num(map_coverd)
+            ##########这里可以有方案二########
             # 向stm32发送地图信息
+            for i in grid_coverd_int:
+                send_order('M'+grid_int[i],ser_32)
             pass
             # 开始路径规划
             while True:
@@ -247,6 +235,8 @@ while True:
                     break
                 time.sleep(0.1)
             # 发送路径信息
+            for i in grid_coverd_int:
+                send_order('P'+grid_int[i],ser_32)
             pass
             # 开始小车运动，发送小车位置
             while PBL!=b'000':
@@ -261,15 +251,45 @@ while True:
         if PBL==b'P23':
             # 首先我们需要识别新的地图数据
             get_image()
-            
-            # 将点的坐标映射后，观察观察每个区域内是否有点
-            
-            # 之后的操作跟以前的方式一样，也可以在原地图上规划路径，不过需要显示新的地图
-            
+            map_change=image_trans(image)
+            grid_change_str, grid_change_int=get_grid_num(map_coverd)
+            # 向stm32发送地图信息
+            for i in grid_change_str:
+                send_order('M'+grid_int[i],ser_32)
+            pass
+            # 开始路径规划
+            # 首先还是转换为原先的地图
+            grid_change_int_go=range(16)
+            for i in range(16):
+                if grid_change_int[i]==16:
+                    grid_change_int_go[i]=16
+            while True:
+                # 等待目标位置的发送
+                if aim_point23 in grid_change_int_go:
+                    # 开始路径规划
+                    road23_best=find_road(aim_point23, grid_change_int_go)
+                    # 现在已经找到了最好的路径
+                    road23_best_str=[]
+                    for i in road23_best:
+                        road23_best_str.append('P'+grid_str[i])
+                    break
+                time.sleep(0.1)
+            # 发送路径信息
+            for i in grid_coverd_int:
+                send_order('P'+grid_int[i],ser_32)
+            pass            
+            # 开始小车运动，发送小车位置
+            while PBL!=b'000':
+                try:
+                    car_point=get_car_point()
+                except:
+                    pass
+                if car_point!=last_car_point:
+                    send_order(car_point,ser_32)
+                    last_car_point=car_point
             pass
         else:
             time.sleep(0.1)
-
     except:
         PBL=0
         last_car_point='C00'
@@ -277,3 +297,21 @@ while True:
         aim_point23=0
         time.sleep(0.1)
 
+'''
+# 找出对应的黑色区域
+black_cover=(map_origin-map_coverd)
+# 建立两个集合用于存放地图信息
+grid_coverd_str=[]
+grid_coverd_int=[]
+# 遍历每个区域，观察是否有遮挡
+for i in range(16):
+    x=int(i/4)*242
+    y=int(i%4)*242
+    b1=np.sum(black_cover[x:x+242,y:y+242]>100)
+    # print(f'{i}:'+str(b1))
+    if (b1>3000):
+        grid_coverd_str.append('MBB')
+    else:
+        grid_coverd_str.append('M'+grid_int[i])
+        grid_coverd_int.append(i)
+'''
