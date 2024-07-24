@@ -21,7 +21,7 @@ aim_point23=0
 last_car_point='C00'
 car_point='C00'
 car_center=[0,0]
-grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','N']
+grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','N']
 grid_int=['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16']
 grid_cross=[[1,4],[2,5,0],[3,6,1],[7,2],[5,8,0],[6,9,4,1],[7,10,5,2],[11,6,3],[9,12,4],[10,13,8,5],[11,14,9,6],[15,10,7],[13,8],[14,12,9],[15,13,10],[14,11]]
 grid_str_int={'0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'A':10,'B':11,'C':12,'D':13,'E':14,'F':15,'N':16}
@@ -220,8 +220,10 @@ while True:
             grid_coverd_str, grid_coverd_int=get_grid_num(map_coverd)
             ##########这里可以有方案二########
             # 向stm32发送地图信息
-            for i in grid_coverd_int:
-                send_order('M'+grid_str[i],ser_32)
+            map22_now='M0123456789ABCDEF'
+            for i in range(16):
+                map22_now[i+1]=grid_coverd_str[i]
+            send_order(map22_now,ser_32)
             pass
             # 开始路径规划
             while True:
@@ -251,9 +253,10 @@ while True:
             map_change=image_trans(image)
             grid_change_str, grid_change_int=get_grid_num(map_coverd)
             # 向stm32发送地图信息
-            for i in grid_change_int:
-                send_order('M'+grid_str[i],ser_32)
-            pass
+            map23_now='M0123456789ABCDEF'
+            for i in range(16):
+                map23_now[i+1]=grid_change_str[i]
+            send_order(map23_now,ser_32)
             # 开始路径规划
             # 首先还是转换为原先的地图
             grid_change_int_go=range(16)
