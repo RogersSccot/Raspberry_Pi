@@ -24,6 +24,7 @@ car_center=[0,0]
 grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
 grid_int=['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15']
 grid_cross=[[1,4],[2,5,0],[3,6,1],[7,2],[5,8,0],[6,9,4,1],[7,10,5,2],[11,6,3],[9,12,4],[10,13,8,5],[11,14,9,6],[15,10,7],[13,8],[14,12,9],[15,13,10],[14,11]]
+grid_str_int={'0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'A':10,'B':11,'C':12,'D':13,'E':14,'F':15,'N':16}
 M=np.load('M.npy')
 # 我们需要将我们读取到的图像映射成一个平整的图像
 ad=cv2.imread('grid.jpg')
@@ -133,6 +134,27 @@ def image_trans(image_to_trans):
     image_after_trans=cv2.cvtColor(image_after_trans, cv2.COLOR_BGR2GRAY)
     _,image_after_trans=cv2.threshold(image_after_trans, 127, 255, cv2.THRESH_BINARY)
     return image_after_trans
+
+# 获取当前地图的数字
+def get_grid_num(image_tra):
+    grid_now_str=['N']*16
+    grid_now_int=[16]*16
+    for i in range(16):
+        x=int(i/4)*242
+        y=int(i%4)*242
+        pi=image_tra[x+20:x+222,y+20:y+222].astype(np.uint8)
+        pi3=np.zeros((202,202,3),dtype=np.uint8)
+        pi3[:,:,0]=pi
+        pi3[:,:,1]=pi
+        pi3[:,:,2]=pi
+        _,num=get_photo_number(pi3)
+        try:
+            grid_now_str[i]=num[0]
+            grid_now_int[i]=grid_str_int[num[0]]
+        except:
+            pass
+    # print(grid_change_int)
+    return grid_now_str, grid_now_int
 
 def find_road(aim_point22, grid_coverd_int):
     road22=[[0]]
