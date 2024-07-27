@@ -1,0 +1,12 @@
+[Unit]
+Description=My service
+After=network.target
+
+[Service]
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/bin/python3 -u /home/saluo/Desktop/Tower_Car/TC2_1.py
+User=saluo
+
+[Install]
+WantedBy=multi-user.target

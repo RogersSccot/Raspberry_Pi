@@ -16,7 +16,7 @@ deep = FastestDet(drawOutput=True)
 ser_32 = serial.Serial('/dev/ttyAMA0', 921600)
 
 PBL=0
-aim_point22=0
+aim_point22=17
 aim_point23=0
 last_car_point='C00'
 car_point='C00'
@@ -25,9 +25,9 @@ grid_str=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','N']
 grid_int=['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16']
 grid_cross=[[1,4],[2,5,0],[3,6,1],[7,2],[5,8,0],[6,9,4,1],[7,10,5,2],[11,6,3],[9,12,4],[10,13,8,5],[11,14,9,6],[15,10,7],[13,8],[14,12,9],[15,13,10],[14,11]]
 grid_str_int={'0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'A':10,'B':11,'C':12,'D':13,'E':14,'F':15,'N':16}
-M=np.load('M.npy')
+M=np.load('/home/saluo/Desktop/Tower_Car/M.npy')
 # 我们需要将我们读取到的图像映射成一个平整的图像
-ad=cv2.imread('grid.jpg')
+ad=cv2.imread('/home/saluo/Desktop/Tower_Car/grid.jpg')
 ad_grey=cv2.cvtColor(ad, cv2.COLOR_BGR2GRAY)
 
 # 开启单独进程，获取题目信号
@@ -44,7 +44,7 @@ def get_photo_number(frame):
     num=[]
     for i in range(len(out)):
         num_position.append(out[i][0])
-        num.append(int(out[i][1]))
+        num.append(str(out[i][1]))
     return  num_position,num
 
 def get_PBL():
@@ -57,6 +57,7 @@ def get_PBL():
             PBL=PBL.decode('utf-8')
             aim_point22=grid_str_int[PBL[2]]
         elif PBL[0]==67:
+            PBL=PBL.decode('utf-8')
             aim_point23=grid_str_int[PBL[2]]
 
 get_PBL_threading = threading.Thread(target=get_PBL)
@@ -196,8 +197,12 @@ def find_road(aim_point22, grid_coverd_int):
     road_final=road_possible[road_length.index(min(road_length))]
     return road_final
 
-get_image()
+for i in range(15):
+    get_image()
 map_origin=image_trans(image)
+s=0
+
+PBL=b'999'
 
 while True:
     try:
@@ -205,38 +210,56 @@ while True:
             time.sleep(0.1)
         if PBL==b'P21':
             # 对应题目的2.1问，首先要确立路径点，然后给串口屏发定位
+            # time.sleep(1)
             while PBL!=b'000':
+            #while True:
                 try:
                     car_point,_=get_car_point()
                 except:
                     pass
                 if car_point!=last_car_point:
+                    #send_order(car_point,ser_32)
+                    #send_order(car_point,ser_32)
                     send_order(car_point,ser_32)
+                    cv2.imwrite(f'{s}.jpg',image)
+                    s=s+1
+                    time.sleep(0.3)
                     last_car_point=car_point
         if PBL==b'P22':
-            # 对应题目的2.2问，首先要确立路径点，然后给串口屏发定位
-            get_image()
+            print('# 对应题目的2.2问，首先要确立路径点，然后给串口屏发定位')
+            get_car_point()
+            for i in range(10):
+                _,image=capture.read()
+                time.sleep(0.5)
+            cv2.imwrite('P22.jpg', image)
             map_coverd=image_trans(image)
             grid_coverd_str, grid_coverd_int=get_grid_num(map_coverd)
             ##########这里可以有方案二########
             # 向stm32发送地图信息
-            map22_now='M0123456789ABCDEF'
+            map22_now="M0123456789ABCDEF"
+            print(grid_coverd_str, grid_coverd_int)
             for i in range(16):
-                map22_now[i+1]=grid_coverd_str[i]
-            send_order(map22_now,ser_32)
+                #print('正在获取图片信息'+str(i))
+                map22_now='M'+map22_now[1:i+1]+grid_coverd_str[i]+map22_now[i+2:]
             pass
             # 开始路径规划
             while True:
                 # 等待目标位置的发送
-                if aim_point22 in grid_coverd_int:
+                if (aim_point22 in grid_coverd_int)&(aim_point22!=0):
+                    time.sleep(1)
+                    # 此时发送路径信息
+                    send_order(map22_now,ser_32)
                     # 开始路径规划
                     road22_best=find_road(aim_point22, grid_coverd_int)
                     # 现在已经找到了最好的路径,发送给32
-                    for i in road22_best:
-                        send_order('P'+grid_int[i],ser_32)
-                    send_order('STOP',ser_32)
                     break
                 time.sleep(0.1)
+            # 发送路径信息
+            time.sleep(1)
+            path22='G'
+            for i in road22_best:
+                path22=path22+grid_str[i]
+            send_order(path22+'Z',ser_32)
             # 开始小车运动，发送小车位置
             while PBL!=b'000':
                 try:
@@ -245,38 +268,53 @@ while True:
                     pass
                 if car_point!=last_car_point:
                     send_order(car_point,ser_32)
+                    cv2.imwrite(f'{s}.jpg',image)
+                    s=s+1
+                    time.sleep(0.3)
+                    #send_order(car_point,ser_32)
+                    #send_order(car_point,ser_32)
                     last_car_point=car_point
             pass
         if PBL==b'P23':
             # 首先我们需要识别新的地图数据
-            get_image()
+            get_car_point()
+            for i in range(10):
+                _,image=capture.read()
+                time.sleep(0.5)
+            cv2.imwrite('P23.jpg', image)
             map_change=image_trans(image)
-            grid_change_str, grid_change_int=get_grid_num(map_coverd)
+            grid_change_str, grid_change_int=get_grid_num(map_change)
             # 向stm32发送地图信息
+            print(grid_change_str)
             map23_now='M0123456789ABCDEF'
             for i in range(16):
-                map23_now[i+1]=grid_change_str[i]
-            send_order(map23_now,ser_32)
+                # print('正在获取图片信息'+str(i))
+                map23_now='M'+map23_now[1:i+1]+grid_change_str[i]+map23_now[i+2:]
             # 开始路径规划
             # 首先还是转换为原先的地图
-            grid_change_int_go=range(16)
+            grid_change_int_go=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
             for i in range(16):
                 if grid_change_int[i]==16:
                     grid_change_int_go[i]=16
             while True:
                 # 等待目标位置的发送
-                if aim_point23 in grid_change_int_go:
+                if (aim_point23 in grid_change_int_go)&(aim_point23!=0):
+                    # 找出aim_point23在grid_change_int中的位置
+                    position = grid_change_int_go.index(aim_point23)
+                    aim_point23=grid_change_int[position]
+                    time.sleep(1)
+                    send_order(map23_now,ser_32)
                     # 开始路径规划
                     road23_best=find_road(aim_point23, grid_change_int_go)
                     # 现在已经找到了最好的路径
-                    road23_best_str=[]
-                    for i in road23_best:
-                        road23_best_str.append('P'+grid_str[i])
                     break
                 time.sleep(0.1)
             # 发送路径信息
-            for i in grid_coverd_int:
-                send_order('P'+grid_int[i],ser_32)
+            time.sleep(1)
+            path23='G'
+            for i in road23_best:
+                path23=path23+grid_str[i]
+            send_order(path23+'Z',ser_32)
             pass
             # 开始小车运动，发送小车位置
             while PBL!=b'000':
@@ -287,11 +325,17 @@ while True:
                     pass
                 if car_point!=last_car_point:
                     send_order(car_point,ser_32)
+                    cv2.imwrite(f'{s}.jpg',image)
+                    s=s+1
+                    time.sleep(0.3)
+                    #send_order(car_point,ser_32)
+                    #send_order(car_point,ser_32)
                     last_car_point=car_point
             pass
         else:
             time.sleep(0.1)
     except:
+        print('Game Over')
         PBL=0
         last_car_point='C00'
         aim_point22=0
