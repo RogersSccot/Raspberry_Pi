@@ -71,6 +71,7 @@ get_PBL_threading.start()
 3.发送Cxx，将用于指定小车位置
 4.发送Mxx，将用于修改地图布局
 '''
+
 def send_order(order, ser):
     print('order='+order)
     encoded_order = order.encode()
