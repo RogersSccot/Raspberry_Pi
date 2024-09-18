@@ -3,6 +3,8 @@ import cv2
 import math
 import matplotlib
 import serial
+import time
+from Vision_Net import FastestDet
 
 # 本代码用于工创赛视觉部分，此为第一版本2024.9.12
 # 对于完整的视觉代码，主要需要解决如下问题
@@ -55,7 +57,6 @@ while True:
             # 等待STM32发送控制指令给我，执行具体的任务，这里并不需要双线程，也不需要记录上位机
 
             pass
-        pass
     except:
         pass
 
