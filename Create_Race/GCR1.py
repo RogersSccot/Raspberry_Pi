@@ -84,14 +84,26 @@ def find_aim_color(aim_color):
     else:
         return get_blue()
 
+# 找到物料
+def get_material():
+    pass
+
+# 找到位置
+def get_position():
+    pass
+
 # 定位物料位置的函数
 def locate_aim_material(aim_image,image):
+    # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
+
     pass
 
 # 定位目标位置的函数
 def locate_aim_position(aim_image,image):
+    # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
+
     pass
 
 # 外界大循环保证程序报错时依旧可以继续运行
