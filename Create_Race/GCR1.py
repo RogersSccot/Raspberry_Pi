@@ -6,19 +6,30 @@ import serial
 import time
 from Vision_Net import FastestDet
 
-# 本代码用于工创赛视觉部分，此为第一版本2024.9.12
-# 对于完整的视觉代码，主要需要解决如下问题
 '''
+本代码用于工创赛视觉部分，此为第一版本2024.9.12
 核心任务及通信协议
-1.识别二维码
-SCAN
-2.识别物料本身的精确位置，并传递误差
-(find the aim material and transport the location error)
-FMRE(红色物料),FMGE(绿色物料),FMBE(蓝色物料)
-3.识别物料放置区精确位置，并传递误差，并传递误差
-(find the aim position and transport the location error)
-FPRE(红色位置),FPGE(绿色位置),FPBE(蓝色位置)
+STM32发给PI
+
+STM32启动完毕:STAR
+走到物料区:LYLQ
+走到粗加工区:LCJG
+走到暂存区:LZCQ
+识别二维码:SCAN
+
+PI发给STM32:
+识别结束后发送:QR+扫描结果
+物料区开始抓取:CATCH(R,G,B)
+粗加工区开始放置(精度要求最高):
+第1次层:PUTL(R,G,B)
+第2次层:PUTH(R,G,B)
+左移1格:MOVL(0,1,2)
+右移1格:MOVR(0,1,2)
+移动后自动开始定位
 '''
+
+#######################################################
+# 外设初始化程序
 # 打开摄像头，占用内存大，不轻易运行
 capture=cv2.VideoCapture(0)
 # 视觉神经网络先初始化，备用
@@ -26,8 +37,13 @@ loo_global=np.zeros((640,480,3),dtype=np.uint8)
 deep = FastestDet(drawOutput=True)
 # 打开串口
 ser_32 = serial.Serial('/dev/ttyAMA0', 921600)
+
+#######################################################
 # 初始化全局变量
+# 当前命令
 PBL = 0
+# 抓取循序(二维码读取结果)
+QR_code=0
 
 # 发送命令的指令
 def send_order(order):
@@ -96,14 +112,12 @@ def get_position():
 def locate_aim_material(aim_image,image):
     # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
-
     pass
 
 # 定位目标位置的函数
 def locate_aim_position(aim_image,image):
     # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
-
     pass
 
 # 外界大循环保证程序报错时依旧可以继续运行
