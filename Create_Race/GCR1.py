@@ -5,24 +5,26 @@ import matplotlib
 import serial
 import time
 from Vision_Net import FastestDet
+from pyzbar import pyzbar
 
 '''
-本代码用于工创赛视觉部分，此为第一版本2024.9.12
+本代码用于工创赛视觉部分,此为第一版本2024.9.12
 核心任务及通信协议
-STM32发给PI
 
+STM32发给PI
 STM32启动完毕:STAR
-走到物料区:LYLQ
-走到粗加工区:LCJG
-走到暂存区:LZCQ
+走到物料区:LWLQ(1,2)
+走到加工区:LCJG(1,2)
+走到暂存区:LZCQ(1,2)
+1为红色,2为绿色,3为蓝色
 识别二维码:SCAN
 
 PI发给STM32:
 识别结束后发送:QR+扫描结果
-物料区开始抓取:CATCH(R,G,B)
+物料区开始抓取:CATCH(1,2,3)
 粗加工区开始放置(精度要求最高):
-第1次层:PUTL(R,G,B)
-第2次层:PUTH(R,G,B)
+第1次层:PUTL(1,2,3)
+第2次层:PUTH(1,2,3)
 左移1格:MOVL(0,1,2)
 右移1格:MOVR(0,1,2)
 移动后自动开始定位
@@ -32,6 +34,7 @@ PI发给STM32:
 # 外设初始化程序
 # 打开摄像头，占用内存大，不轻易运行
 capture=cv2.VideoCapture(0)
+capture_side=cv2.VideoCapture(1)
 # 视觉神经网络先初始化，备用
 loo_global=np.zeros((640,480,3),dtype=np.uint8)
 deep = FastestDet(drawOutput=True)
@@ -50,6 +53,15 @@ def send_order(order):
     print('order='+order)
     encoded_order = order.encode()
     ser_32.write(encoded_order)
+
+# 处理命令的函数
+def order_deal(order_temp):
+    order_temp=min(max(-999,order_temp),999)
+    if order_temp>=0:
+        error='+'+str(int(int(order_temp)%1000/100))+str(int(int(order_temp)%100/10))+str(int(order_temp)%10)
+    if order_temp<0:
+        error='-'+str(int(int((-order_temp))%1000/100))+str(int(int((-order_temp))%100/10))+str(int((-order_temp))%10)
+    return error
 
 # 获取消息，通用函数
 def get_mail(ser):
@@ -91,34 +103,55 @@ def get_blue():
 
 # 突出目标颜色
 def find_aim_color(aim_color):
-    if aim_color == 'R':
+    if aim_color == '1':
         return get_red()
-    if aim_color == 'G':
+    if aim_color == '2':
         return get_green()
-    if aim_color == 'B':
+    if aim_color == '3':
         return get_blue()
     else:
         return get_blue()
 
 # 找到物料
 def get_material():
-    pass
+    # 分别返回目标的行列
+    material_XY=0,0
+    print('get_material函数未完善')
+    return material_XY
 
 # 找到位置
 def get_position():
-    pass
+    # 分别返回目标的行列
+    position_XY=0,0
+    print('get_position函数未完善')
+    return position_XY
 
 # 定位物料位置的函数
 def locate_aim_material(aim_image,image):
     # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
+    print('locate_aim_material函数未完善')
     pass
 
 # 定位目标位置的函数
 def locate_aim_position(aim_image,image):
     # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
+    print('locate_aim_position函数未完善')
     pass
+
+# 识别二维码，对二维码进行编译，返回值
+def decode_qr_code(QR_img):
+    return pyzbar.decode(QR_img, symbols=[pyzbar.ZBarSymbol.QRCODE])
+
+# 判断在物料区当前视角中是否有是目标物料
+def Judge_WLQ_material(aim_image,aim_color):
+    print('Judge_WLQ_material函数未完善')
+    return 0
+
+#######################################################
+# 主控程序
+#######################################################
 
 # 外界大循环保证程序报错时依旧可以继续运行
 while True:
@@ -127,42 +160,80 @@ while True:
             PBL = ser_32.read(4)
             PBL=PBL.decode('utf-8')
             # 等待STM32发送控制指令给我，执行具体的任务，这里并不需要双线程，也不需要记录上位机
+            if PBL=='STAR':
+                # 收到启动信号时，点灯
+                send_order('OKOK')
             if PBL == 'SCAN':
-                # 扫描二维码
+                # 扫描二维码，并生成抓取顺序
+                _,QR_img=capture_side.read()
+                # 获取二维码结果
+                QR_results = decode_qr_code(QR_img)
+                print("2,正在解码:")
+                if len(QR_results):
+                    print("解码结果:")
+                    QR_results=QR_results[0].data.decode("utf-8")
+                    print(QR_results)
+                else:
+                    print("无法识别:")
+                    QR_results='213+231'
+                # 发送二维码结果给STM32
+                send_order('QR'+QR_results)
+                # 此时我们已获得二维码结果，分析抓取顺序
+                QR1,QR2=QR_code.split('+')
+                send_order('OKOK')
+
+            if PBL[0]=='L':
+                # 此时是定位指令，必须
+                if PBL[0:4]=='LWLQ':
+                    # 此时是定位物料区，开始判断物料颜色
+                    goods_num=0
+                    while goods_num<3:
+                        # 刷新图像
+                        get_image()
+                        # 获取物料颜色
+                        if PBL[0:5]=='LWLQ1':
+                            aim_color=QR1[goods_num]
+                        else:
+                            aim_color=QR2[goods_num]
+                        # 判断目标位置中有无物料
+                        if Judge_WLQ_material(find_aim_color(aim_color),aim_color):
+                            # 抓取物料
+                            send_order('CATCH'+aim_color)
+                            goods_num+=1
+                        else:
+                            time.sleep(0.1)
+
+                if PBL=='LCJG':
+                    # 此时是定位加工区
+                    # 首先进行校准
+                    dis_error = 100
+                    while dis_error>10:
+                        # 获取图像
+                        get_image()
+                        # 突出目标颜色
+                        # 站在车的视角，从左到右依次为蓝，绿，红
+                        circle_center=np.zeros((3,2))
+                        for i in range(3):
+                            circle_center[i,0],circle_center[i,1]=get_material(find_aim_color(str(i+1)))
+                        # 此时我们获取到了三个物料的位置，开始定位
+                        K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
+                        X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
+                        dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
+                        # 发送定位指令
+                        send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
+                        pass
+                    pass
+                    # 此时已经定位完毕，开始放置物料
+                    
+                if PBL=='LZCQ':
+                    # 此时是定位暂存区
+                    pass
                 pass
-            # 此时是定位指令
-            if PBL(0) == 'F':
-                # 定义目标颜色
-                aim_color=PBL(2)
-                # 如果为物料定位指令
-                if PBL(1) == 'M':
-                    # 定义误差标准
-                    dis_error = 100
-                    while dis_error>10:
-                        # 获取图像
-                        get_image()
-                        # 突出目标颜色
-                        aim_image = find_aim_color(aim_color)
-                        # 定位目标位置
-                        dis_error, order=locate_aim_material(aim_image,image)
-                        pass
-                    pass
-                # 此时是位置定位指令
-                if PBL(1) == 'P':
-                    # 定义误差标准
-                    dis_error = 100
-                    while dis_error>10:
-                        # 获取图像
-                        get_image()
-                        # 突出目标颜色
-                        aim_image = find_aim_color(aim_color)
-                        # 定位目标位置
-                        dis_error, order=locate_aim_position(aim_image,image)
-                        pass
-                    pass
-            # 读取STM32的指令
+            # 更新STM32指令
+            PBL=0
             pass
     except:
+        PBL=0
         pass
 
 
