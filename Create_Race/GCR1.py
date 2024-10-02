@@ -32,10 +32,11 @@ PI发给STM32:
 
 #######################################################
 # 外设初始化程序
-# 打开摄像头，占用内存大，不轻易运行
+# 打开摄像头,占用内存大,不轻易运行
+# 摄像头0表示主摄像头,1表示侧摄像头
 capture=cv2.VideoCapture(0)
 capture_side=cv2.VideoCapture(1)
-# 视觉神经网络先初始化，备用
+# 视觉神经网络先初始化,备用
 loo_global=np.zeros((640,480,3),dtype=np.uint8)
 deep = FastestDet(drawOutput=True)
 # 打开串口
@@ -58,19 +59,19 @@ def send_order(order):
 def order_deal(order_temp):
     order_temp=min(max(-999,order_temp),999)
     if order_temp>=0:
-        error='+'+str(int(int(order_temp)%1000/100))+str(int(int(order_temp)%100/10))+str(int(order_temp)%10)
+        order_part='+'+str(int(int(order_temp)%1000/100))+str(int(int(order_temp)%100/10))+str(int(order_temp)%10)
     if order_temp<0:
-        error='-'+str(int(int((-order_temp))%1000/100))+str(int(int((-order_temp))%100/10))+str(int((-order_temp))%10)
-    return error
+        order_part='-'+str(int(int((-order_temp))%1000/100))+str(int(int((-order_temp))%100/10))+str(int((-order_temp))%10)
+    return order_part
 
-# 获取消息，通用函数
+# 获取消息,通用函数
 def get_mail(ser):
     encoded_mail = ser.read(1)
     print('mail='+encoded_mail)
 
 # 获取并处理图像
 def get_image():
-    # 开全局变量处理，分理处红绿蓝
+    # 开全局变量处理,分理处红绿蓝
     global image, image_red, image_green, image_blue
     # 从摄像头获取图像
     _,image=capture.read()
@@ -128,19 +129,19 @@ def get_position():
 
 # 定位物料位置的函数
 def locate_aim_material(aim_image,image):
-    # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
+    # 这里K表示车的倾斜度,X表示横向误差,Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
     print('locate_aim_material函数未完善')
     pass
 
 # 定位目标位置的函数
 def locate_aim_position(aim_image,image):
-    # 这里K表示车的倾斜度，X表示横向误差，Y表示纵向误差
+    # 这里K表示车的倾斜度,X表示横向误差,Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
     print('locate_aim_position函数未完善')
     pass
 
-# 识别二维码，对二维码进行编译，返回值
+# 识别二维码,对二维码进行编译,返回值
 def decode_qr_code(QR_img):
     return pyzbar.decode(QR_img, symbols=[pyzbar.ZBarSymbol.QRCODE])
 
@@ -159,16 +160,16 @@ while True:
         while True:
             PBL = ser_32.read(4)
             PBL=PBL.decode('utf-8')
-            # 等待STM32发送控制指令给我，执行具体的任务，这里并不需要双线程，也不需要记录上位机
+            # 等待STM32发送控制指令给我,执行具体的任务,这里并不需要双线程,也不需要记录上位机
             if PBL=='STAR':
-                # 收到启动信号时，点灯
+                # 收到启动信号时,点灯
                 send_order('OKOK')
             if PBL == 'SCAN':
-                # 扫描二维码，并生成抓取顺序
+                # 扫描二维码,并生成抓取顺序
                 _,QR_img=capture_side.read()
                 # 获取二维码结果
                 QR_results = decode_qr_code(QR_img)
-                print("2,正在解码:")
+                print("正在解码")
                 if len(QR_results):
                     print("解码结果:")
                     QR_results=QR_results[0].data.decode("utf-8")
@@ -178,14 +179,14 @@ while True:
                     QR_results='213+231'
                 # 发送二维码结果给STM32
                 send_order('QR'+QR_results)
-                # 此时我们已获得二维码结果，分析抓取顺序
+                # 此时我们已获得二维码结果,分析抓取顺序
                 QR1,QR2=QR_code.split('+')
                 send_order('OKOK')
 
             if PBL[0]=='L':
-                # 此时是定位指令，必须
+                # 此时是定位指令,必须
                 if PBL[0:4]=='LWLQ':
-                    # 此时是定位物料区，开始判断物料颜色
+                    # 此时是定位物料区,开始判断物料颜色
                     goods_num=0
                     while goods_num<3:
                         # 刷新图像
@@ -202,8 +203,10 @@ while True:
                             goods_num+=1
                         else:
                             time.sleep(0.1)
+                    # 此时已抓完物料
+                    send_order('OKOK')
 
-                if PBL=='LCJG':
+                if PBL[0:4]=='LCJG':
                     # 此时是定位加工区
                     # 首先进行校准
                     dis_error = 100
@@ -211,11 +214,11 @@ while True:
                         # 获取图像
                         get_image()
                         # 突出目标颜色
-                        # 站在车的视角，从左到右依次为蓝，绿，红
+                        # 站在车的视角,从左到右依次为蓝,绿,红
                         circle_center=np.zeros((3,2))
                         for i in range(3):
                             circle_center[i,0],circle_center[i,1]=get_material(find_aim_color(str(i+1)))
-                        # 此时我们获取到了三个物料的位置，开始定位
+                        # 此时我们获取到了三个物料的位置,开始定位
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
                         dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
@@ -223,7 +226,15 @@ while True:
                         send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
                         pass
                     pass
-                    # 此时已经定位完毕，开始放置物料
+                    # 此时已经定位完毕,开始放置物料，首先需要将车移动到正确的位置
+                    # 第一个物料
+                    if PBL[0:5]=='LCJG1':
+                        aim_color=QR1[goods_num]
+                    else:
+                        aim_color=QR2[goods_num]
+                    ################到这里了###########
+                    
+
                     
                 if PBL=='LZCQ':
                     # 此时是定位暂存区
