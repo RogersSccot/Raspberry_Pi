@@ -150,6 +150,13 @@ def Judge_WLQ_material(aim_image,aim_color):
     print('Judge_WLQ_material函数未完善')
     return 0
 
+def Move_Color(dis1):
+    if dis1>=0:
+        send_order('MOVR'+str(abs(dis1)))
+    else:
+        send_order('MOVL'+str(abs(dis1)))
+    pass
+
 #######################################################
 # 主控程序
 #######################################################
@@ -222,24 +229,68 @@ while True:
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
                         dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
-                        # 发送定位指令
+                        # 发送定位指令 
                         send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
                         pass
                     pass
                     # 此时已经定位完毕,开始放置物料，首先需要将车移动到正确的位置
-                    # 第一个物料
-                    if PBL[0:5]=='LCJG1':
-                        aim_color=QR1[goods_num]
-                    else:
-                        aim_color=QR2[goods_num]
-                    ################到这里了###########
-                    
+                    # 记录下当前的位置
+                    Location_Now=2
+                    for goods_num in range(3):
+                        if PBL[0:5]=='LCJG1':
+                            aim_color=QR1[goods_num]
+                            put_order_LCJG='PUTL'+aim_color
+                        else:
+                            aim_color=QR2[goods_num]
+                            put_order_LCJG='PUTH'+aim_color
+                        Move_Dis=int(aim_color)-Location_Now
+                        Move_Color(Move_Dis)
+                        Location_Now=int(aim_color)
+                        # 放置物料
+                        send_order(put_order_LCJG)
+                        '''
+                        这里是否需要定位暂时待定
+                        '''
 
-                    
                 if PBL=='LZCQ':
                     # 此时是定位暂存区
+                    # 首先进行校准
+                    dis_error = 100
+                    while dis_error>10:
+                        # 获取图像
+                        get_image()
+                        # 突出目标颜色
+                        # 站在车的视角,从左到右依次为蓝,绿,红
+                        circle_center=np.zeros((3,2))
+                        for i in range(3):
+                            circle_center[i,0],circle_center[i,1]=get_material(find_aim_color(str(i+1)))
+                        # 此时我们获取到了三个物料的位置,开始定位
+                        K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
+                        X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
+                        dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
+                        # 发送定位指令 
+                        send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
+                        pass
                     pass
-                pass
+                    # 此时已经定位完毕,开始放置物料，首先需要将车移动到正确的位置
+                    # 记录下当前的位置
+                    Location_Now=2
+                    for goods_num in range(3):
+                        if PBL[0:5]=='LZCQ1':
+                            aim_color=QR1[goods_num]
+                            put_order_LZCQ='PUTL'+aim_color
+                        else:
+                            aim_color=QR2[goods_num]
+                            put_order_LZCQ='PUTH'+aim_color
+                        Move_Dis=int(aim_color)-Location_Now
+                        Move_Color(Move_Dis)
+                        Location_Now=int(aim_color)
+                        # 放置物料
+                        send_order(put_order_LZCQ)
+                        '''
+                        这里是否需要定位暂时待定
+                        '''
+
             # 更新STM32指令
             PBL=0
             pass
