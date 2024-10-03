@@ -22,6 +22,7 @@ STM32启动完毕:STAR
 PI发给STM32:
 识别结束后发送:QR+扫描结果
 物料区开始抓取:CATCH(1,2,3)
+粗加工开始抓取:CATL(1,2,3)
 粗加工区开始放置(精度要求最高):
 第1次层:PUTL(1,2,3)
 第2次层:PUTH(1,2,3)
@@ -41,7 +42,6 @@ loo_global=np.zeros((640,480,3),dtype=np.uint8)
 deep = FastestDet(drawOutput=True)
 # 打开串口
 ser_32 = serial.Serial('/dev/ttyAMA0', 921600)
-
 #######################################################
 # 初始化全局变量
 # 当前命令
@@ -214,7 +214,7 @@ while True:
                     send_order('OKOK')
 
                 if PBL[0:4]=='LCJG':
-                    # 此时是定位加工区
+                    # 此时是定位加工区,这里放的时候不需要顺序,但是拿的时候需要顺序
                     # 首先进行校准
                     dis_error = 100
                     while dis_error>10:
@@ -229,11 +229,9 @@ while True:
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
                         dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
-                        # 发送定位指令 
+                        # 发送定位指令
                         send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
-                        pass
-                    pass
-                    # 此时已经定位完毕,开始放置物料，首先需要将车移动到正确的位置
+                    # 此时已经定位完毕,开始放置物料,首先需要将车移动到正确的位置
                     # 记录下当前的位置
                     Location_Now=2
                     for goods_num in range(3):
@@ -242,12 +240,28 @@ while True:
                             put_order_LCJG='PUTL'+aim_color
                         else:
                             aim_color=QR2[goods_num]
-                            put_order_LCJG='PUTH'+aim_color
+                            put_order_LCJG='PUTL'+aim_color
                         Move_Dis=int(aim_color)-Location_Now
                         Move_Color(Move_Dis)
                         Location_Now=int(aim_color)
                         # 放置物料
                         send_order(put_order_LCJG)
+                        '''
+                        这里是否需要定位暂时待定
+                        '''
+                    # 此时已放置完物料,接下来我们需要取走物料
+                    for goods_num in range(3):
+                        if PBL[0:5]=='LCJG1':
+                            aim_color=QR1[goods_num]
+                            catch_order_LCJG='CATL'+aim_color
+                        else:
+                            aim_color=QR2[goods_num]
+                            catch_order_LCJG='CATL'+aim_color
+                        Move_Dis=int(aim_color)-Location_Now
+                        Move_Color(Move_Dis)
+                        Location_Now=int(aim_color)
+                        # 取走物料
+                        send_order(catch_order_LCJG)
                         '''
                         这里是否需要定位暂时待定
                         '''
@@ -270,9 +284,7 @@ while True:
                         dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
                         # 发送定位指令 
                         send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
-                        pass
-                    pass
-                    # 此时已经定位完毕,开始放置物料，首先需要将车移动到正确的位置
+                    # 此时已经定位完毕,开始放置物料,首先需要将车移动到正确的位置
                     # 记录下当前的位置
                     Location_Now=2
                     for goods_num in range(3):
