@@ -12,12 +12,12 @@ from pyzbar import pyzbar
 核心任务及通信协议
 
 STM32发给PI
-STM32启动完毕:STAR
+STM32启动完毕:START
 走到物料区:LWLQ(1,2)
 走到加工区:LCJG(1,2)
 走到暂存区:LZCQ(1,2)
 1为红色,2为绿色,3为蓝色
-识别二维码:SCAN
+识别二维码:SCANF
 
 PI发给STM32:
 识别结束后发送:QR+扫描结果
@@ -117,7 +117,7 @@ def find_aim_color(aim_color):
 def get_material():
     # 分别返回目标的行列
     material_XY=0,0
-    print('get_material函数未完善')
+    print('get_material函数未完善,暂时不需要')
     return material_XY
 
 # 找到位置
@@ -131,14 +131,14 @@ def get_position():
 def locate_aim_material(aim_image,image):
     # 这里K表示车的倾斜度,X表示横向误差,Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
-    print('locate_aim_material函数未完善')
+    print('locate_aim_material函数未完善,暂时不需要')
     pass
 
 # 定位目标位置的函数
 def locate_aim_position(aim_image,image):
     # 这里K表示车的倾斜度,X表示横向误差,Y表示纵向误差
     dis_error, order=100,'K+000X+000Y+000'
-    print('locate_aim_position函数未完善')
+    print('locate_aim_position函数未完善,暂时不需要')
     pass
 
 # 识别二维码,对二维码进行编译,返回值
@@ -165,13 +165,13 @@ def Move_Color(dis1):
 while True:
     try:
         while True:
-            PBL = ser_32.read(4)
+            PBL = ser_32.read(5)
             PBL=PBL.decode('utf-8')
             # 等待STM32发送控制指令给我,执行具体的任务,这里并不需要双线程,也不需要记录上位机
-            if PBL=='STAR':
+            if PBL=='START':
                 # 收到启动信号时,点灯
                 send_order('OKOK')
-            if PBL == 'SCAN':
+            if PBL == 'SCANF':
                 # 扫描二维码,并生成抓取顺序
                 _,QR_img=capture_side.read()
                 # 获取二维码结果
@@ -224,7 +224,7 @@ while True:
                         # 站在车的视角,从左到右依次为蓝,绿,红
                         circle_center=np.zeros((3,2))
                         for i in range(3):
-                            circle_center[i,0],circle_center[i,1]=get_material(find_aim_color(str(i+1)))
+                            circle_center[i,0],circle_center[i,1]=get_position(find_aim_color(str(i+1)))
                         # 此时我们获取到了三个物料的位置,开始定位
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
@@ -249,6 +249,7 @@ while True:
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        time.sleep(3)
                     # 此时已放置完物料,接下来我们需要取走物料
                     for goods_num in range(3):
                         if PBL[0:5]=='LCJG1':
@@ -265,6 +266,7 @@ while True:
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        time.sleep(3)
 
                 if PBL=='LZCQ':
                     # 此时是定位暂存区
@@ -277,7 +279,7 @@ while True:
                         # 站在车的视角,从左到右依次为蓝,绿,红
                         circle_center=np.zeros((3,2))
                         for i in range(3):
-                            circle_center[i,0],circle_center[i,1]=get_material(find_aim_color(str(i+1)))
+                            circle_center[i,0],circle_center[i,1]=get_position(find_aim_color(str(i+1)))
                         # 此时我们获取到了三个物料的位置,开始定位
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
@@ -302,6 +304,7 @@ while True:
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        time.sleep(3)
 
             # 更新STM32指令
             PBL=0
