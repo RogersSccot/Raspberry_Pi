@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import math
-import matplotlib
 import serial
 import time
 from Vision_Net import FastestDet
@@ -48,6 +47,10 @@ ser_32 = serial.Serial('/dev/ttyAMA0', 921600)
 PBL = 0
 # 抓取循序(二维码读取结果)
 QR_code=0
+# 决定是否在放置时重复定位
+put_locate=0
+# 决定是否在抓取时重复定位
+cat_locate=0
 
 # 发送命令的指令
 def send_order(order):
@@ -146,9 +149,9 @@ def decode_qr_code(QR_img):
     return pyzbar.decode(QR_img, symbols=[pyzbar.ZBarSymbol.QRCODE])
 
 # 判断在物料区当前视角中是否有是目标物料
-def Judge_WLQ_material(aim_image,aim_color):
-    print('Judge_WLQ_material函数未完善')
-    return 0
+def Judge_WLQ_material(aim_image):
+    _right_color=np.sum(aim_image[240:400,240:400])
+    return _right_color>900000
 
 def Move_Color(dis1):
     if dis1>=0:
@@ -156,6 +159,36 @@ def Move_Color(dis1):
     else:
         send_order('MOVL'+str(abs(dis1)))
     pass
+
+# 在目标图像中寻找圆并找出圆心
+def Hough_Circle_get():
+    _img1 = image.copy()
+    _img_gray1 = cv2.cvtColor(_img1, cv2.COLOR_BGR2GRAY)                        
+    circle_center=np.zeros((3,2))
+    # 进行中值滤波(这里我们略去)
+    _dst_img1 = _img_gray1
+    # 霍夫圆检测
+    circle = cv2.HoughCircles(_dst_img1, cv2.HOUGH_GRADIENT, 1, 150,param1=100, param2=70, minRadius=0, maxRadius=10000)
+    print(PBL+':'+circle)
+    return circle
+
+# 此时获得的结果分别为圆心的x,y坐标和半径
+def get_aim_circle(circles,aim_color):
+    circle_possible=np.zeros((3))
+    # 遍历所有圆心，找到对应颜色的圆心
+    for j in range(len(circles[0, :])):
+        i=circles[0, j]
+        if (i[2] > 40)&(i[2] < 80):
+            # 在此处绘制正方形的长宽
+            R=70
+            top_left_corner=(int(i[0])-R, int(i[1])-R)
+            bottom_right_corner=(int(i[0])+R, int(i[1])+R)
+            # 提取目标颜色
+            _color_only_temp=find_aim_color(aim_color)
+            circle_possible[j]=np.sum(_color_only_temp[top_left_corner[1]:bottom_right_corner[1], top_left_corner[0]:bottom_right_corner[0]])
+    # 找到目标颜色的圆心
+    aim_circle=circles[0, np.argmax(circle_possible)]  
+    return aim_circle
 
 #######################################################
 # 主控程序
@@ -168,11 +201,12 @@ while True:
             PBL = ser_32.read(5)
             PBL=PBL.decode('utf-8')
             # 等待STM32发送控制指令给我,执行具体的任务,这里并不需要双线程,也不需要记录上位机
+            # 收到启动信号时,点灯
             if PBL=='START':
-                # 收到启动信号时,点灯
                 send_order('OKOK')
+            
+            # 扫描二维码,并生成抓取顺序
             if PBL == 'SCANF':
-                # 扫描二维码,并生成抓取顺序
                 _,QR_img=capture_side.read()
                 # 获取二维码结果
                 QR_results = decode_qr_code(QR_img)
@@ -189,11 +223,11 @@ while True:
                 # 此时我们已获得二维码结果,分析抓取顺序
                 QR1,QR2=QR_code.split('+')
                 send_order('OKOK')
-
+            
+            # 此时是定位指令,必须
             if PBL[0]=='L':
-                # 此时是定位指令,必须
+                # 此时是定位物料区,开始判断物料颜色
                 if PBL[0:4]=='LWLQ':
-                    # 此时是定位物料区,开始判断物料颜色
                     goods_num=0
                     while goods_num<3:
                         # 刷新图像
@@ -204,7 +238,7 @@ while True:
                         else:
                             aim_color=QR2[goods_num]
                         # 判断目标位置中有无物料
-                        if Judge_WLQ_material(find_aim_color(aim_color),aim_color):
+                        if Judge_WLQ_material(find_aim_color(aim_color)):
                             # 抓取物料
                             send_order('CATCH'+aim_color)
                             goods_num+=1
@@ -212,9 +246,9 @@ while True:
                             time.sleep(0.1)
                     # 此时已抓完物料
                     send_order('OKOK')
-
+                
+                # 此时是定位加工区,这里放的时候不需要顺序,但是拿的时候需要顺序
                 if PBL[0:4]=='LCJG':
-                    # 此时是定位加工区,这里放的时候不需要顺序,但是拿的时候需要顺序
                     # 首先进行校准
                     dis_error = 100
                     while dis_error>10:
@@ -222,9 +256,15 @@ while True:
                         get_image()
                         # 突出目标颜色
                         # 站在车的视角,从左到右依次为蓝,绿,红
+                        # 进行霍夫圆检测
+                        _circle_now=Hough_Circle_get()
+                        # 判定检测是否合理，否则重新检测
+                        while len(_circle_now[0, :])!=3:
+                            _circle_now=Hough_Circle_get()
+                        # 建立圆心集合
                         circle_center=np.zeros((3,2))
                         for i in range(3):
-                            circle_center[i,0],circle_center[i,1]=get_position(find_aim_color(str(i+1)))
+                            circle_center[i,0],circle_center[i,1]=get_aim_circle(_circle_now,str(i+1))
                         # 此时我们获取到了三个物料的位置,开始定位
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
@@ -244,11 +284,29 @@ while True:
                         Move_Dis=int(aim_color)-Location_Now
                         Move_Color(Move_Dis)
                         Location_Now=int(aim_color)
-                        # 放置物料
-                        send_order(put_order_LCJG)
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        if put_locate==1:
+                            dis_error = 100
+                            while dis_error>10:
+                                # 获取图像
+                                get_image()
+                                # 突出目标颜色
+                                # 站在车的视角,从左到右依次为蓝,绿,红
+                                # 进行霍夫圆检测
+                                _circle_now=Hough_Circle_get()
+                                # 获取目标圆心
+                                _circle_center=get_aim_circle(_circle_now,aim_color)
+                                # 此时我们获取到了三个物料的位置,开始定位
+                                K_CJG=0
+                                X_CJQ,Y_CJQ=_circle_center[0]-320,_circle_center[1]-240
+                                dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
+                                # 发送定位指令
+                                send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
+                            pass
+                        # 放置物料
+                        send_order(put_order_LCJG)
                         time.sleep(3)
                     # 此时已放置完物料,接下来我们需要取走物料
                     for goods_num in range(3):
@@ -266,10 +324,29 @@ while True:
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        if cat_locate==1:
+                            dis_error = 100
+                            while dis_error>10:
+                                # 获取图像
+                                get_image()
+                                # 突出目标颜色
+                                # 站在车的视角,从左到右依次为蓝,绿,红
+                                # 进行霍夫圆检测
+                                _circle_now=Hough_Circle_get()
+                                # 获取目标圆心
+                                _circle_center=get_aim_circle(_circle_now,aim_color)
+                                # 此时我们获取到了三个物料的位置,开始定位
+                                K_CJG=0
+                                X_CJQ,Y_CJQ=_circle_center[0]-320,_circle_center[1]-240
+                                dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
+                                # 发送定位指令
+                                send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
+                            pass
                         time.sleep(3)
 
-                if PBL=='LZCQ':
-                    # 此时是定位暂存区
+                # 此时是定位暂存区
+                if PBL[0:4]=='LZCQ':
+
                     # 首先进行校准
                     dis_error = 100
                     while dis_error>10:
@@ -277,9 +354,15 @@ while True:
                         get_image()
                         # 突出目标颜色
                         # 站在车的视角,从左到右依次为蓝,绿,红
+                        # 进行霍夫圆检测
+                        _circle_now=Hough_Circle_get()
+                        # 判定检测是否合理，否则重新检测
+                        while len(_circle_now[0, :])!=3:
+                            _circle_now=Hough_Circle_get()
+                        # 建立圆心集合
                         circle_center=np.zeros((3,2))
                         for i in range(3):
-                            circle_center[i,0],circle_center[i,1]=get_position(find_aim_color(str(i+1)))
+                            circle_center[i,0],circle_center[i,1]=get_aim_circle(_circle_now,str(i+1))
                         # 此时我们获取到了三个物料的位置,开始定位
                         K_CJG,_=np.polyfit(circle_center[:,1], circle_center[:,0], 1)
                         X_CJQ,Y_CJQ=circle_center[1,1]-320,circle_center[1,0]-240
@@ -304,6 +387,24 @@ while True:
                         '''
                         这里是否需要定位暂时待定
                         '''
+                        if put_locate==1:
+                            dis_error = 100
+                            while dis_error>10:
+                                # 获取图像
+                                get_image()
+                                # 突出目标颜色
+                                # 站在车的视角,从左到右依次为蓝,绿,红
+                                # 进行霍夫圆检测
+                                _circle_now=Hough_Circle_get()
+                                # 获取目标圆心
+                                _circle_center=get_aim_circle(_circle_now,aim_color)
+                                # 此时我们获取到了三个物料的位置,开始定位
+                                K_CJG=0
+                                X_CJQ,Y_CJQ=_circle_center[0]-320,_circle_center[1]-240
+                                dis_error=math.sqrt(X_CJQ**2+Y_CJQ**2)
+                                # 发送定位指令
+                                send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
+                            pass
                         time.sleep(3)
 
             # 更新STM32指令
