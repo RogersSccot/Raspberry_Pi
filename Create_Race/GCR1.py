@@ -382,8 +382,6 @@ while True:
                         Move_Dis=int(aim_color)-Location_Now
                         Move_Color(Move_Dis)
                         Location_Now=int(aim_color)
-                        # 放置物料
-                        send_order(put_order_LZCQ)
                         '''
                         这里是否需要定位暂时待定
                         '''
@@ -405,6 +403,8 @@ while True:
                                 # 发送定位指令
                                 send_order('K'+order_deal(K_CJG)+'X'+order_deal(X_CJQ)+'Y'+order_deal(Y_CJQ))
                             pass
+                        # 放置物料
+                        send_order(put_order_LZCQ)
                         time.sleep(3)
 
             # 更新STM32指令
